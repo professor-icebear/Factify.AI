@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Factify.AI</title>
+  <meta charset="UTF-8">
+  <link href="popup.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <div class="initial-view">
+      <header>
+        <h1>Factify.AI</h1>
+        <p class="subtitle">AI-powered fact-checking</p>
+      </header>
+
+      <button id="analyze" class="analyze-button">
+        Analyze This Page
+      </button>
+    </div>
+
+    <div class="analysis-view hidden">
+      <div id="loading" class="section hidden">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+          <p>Analyzing content...</p>
+        </div>
+      </div>
+
+      <div id="error" class="section hidden">
+        <div class="error-box">
+          <p id="error-message"></p>
+        </div>
+      </div>
+
+      <div id="results" class="section hidden">
+        <div class="results-content">
+          <div class="score-section">
+            <h2>Reliability Score</h2>
+            <div class="score-display">
+              <div class="score-circle">
+                <span id="reliability-score">0</span>
+              </div>
+              <span class="score-max">/10</span>
+            </div>
+          </div>
+
+          <p id="reliability-explanation" class="explanation"></p>
+
+          <div id="factual-status" class="status-box"></div>
+
+          <div class="analysis-section">
+            <h2>Analysis</h2>
+            <p id="analysis"></p>
+          </div>
+
+          <div id="false-claims-section" class="claims-section hidden">
+            <h2>False Claims</h2>
+            <div id="false-claims"></div>
+          </div>
+
+          <div id="sources-section" class="sources-section hidden">
+            <h2>Sources</h2>
+            <div id="sources"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 

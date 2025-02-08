@@ -13,6 +13,18 @@ console.log('API Key starts with:', apiKey.substring(0, 10));
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 interface FactCheckResponse {
   reliability_score: number;
   reliability_explanation: string;
@@ -27,6 +39,33 @@ interface FactCheckResponse {
     url: string;
     relevance: string;
   }>;
+}
+
+// Add this interface after the FactCheckResponse interface
+interface ReliabilityIndicator {
+  score: number;
+  color: string;
+}
+
+function getReliabilityColor(score: number): string {
+  if (score >= 8) return '#15803D'; // Green for high reliability
+  if (score >= 5) return '#CA8A04'; // Yellow for medium reliability
+  return '#DC2626'; // Red for low reliability
+}
+
+// Add this helper function at the top after imports
+function sanitizeJsonString(str: string): string {
+  return str
+    // Remove control characters
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    // Escape quotes and backslashes
+    .replace(/\\(?!["\\/bfnrt])/g, '\\\\')
+    .replace(/"/g, '\\"')
+    // Replace line breaks and tabs with spaces
+    .replace(/[\n\r\t]/g, ' ')
+    // Remove multiple spaces
+    .replace(/ +/g, ' ')
+    .trim();
 }
 
 async function scrapeWebpage(url: string) {
@@ -101,6 +140,210 @@ async function scrapeWebpage(url: string) {
   }
 }
 
+async function validateUrl(url: string): Promise<boolean> {
+  try {
+    const response = await axios.head(url, {
+      timeout: 5000,
+      validateStatus: (status) => status < 400
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function searchReliableSources(query: string): Promise<Array<{title: string, url: string, relevance: string}>> {
+  // Define reliable fact-checking domains with their proper search URL formats
+  const reliableSources = [
+    // Primary Fact-Checking Organizations
+    {
+      domain: 'reuters.com',
+      searchUrl: (q: string) => `https://www.reuters.com/search/news?blob=${encodeURIComponent(q)}`,
+      title: 'Reuters'
+    },
+    {
+      domain: 'apnews.com',
+      searchUrl: (q: string) => `https://apnews.com/search?q=${encodeURIComponent(q)}&searchBy=text`,
+      title: 'Associated Press'
+    },
+    {
+      domain: 'factcheck.org',
+      searchUrl: (q: string) => `https://www.factcheck.org/?s=${encodeURIComponent(q)}`,
+      title: 'FactCheck.org'
+    },
+    {
+      domain: 'snopes.com',
+      searchUrl: (q: string) => `https://www.snopes.com/?s=${encodeURIComponent(q)}`,
+      title: 'Snopes'
+    },
+    {
+      domain: 'politifact.com',
+      searchUrl: (q: string) => `https://www.politifact.com/search/?q=${encodeURIComponent(q)}`,
+      title: 'PolitiFact'
+    },
+    // Major News Organizations
+    {
+      domain: 'nytimes.com',
+      searchUrl: (q: string) => `https://www.nytimes.com/search?dropmab=true&query=${encodeURIComponent(q)}&sort=best`,
+      title: 'The New York Times'
+    },
+    {
+      domain: 'washingtonpost.com',
+      searchUrl: (q: string) => `https://www.washingtonpost.com/search/?query=${encodeURIComponent(q)}&facets=%7B%22time%22%3A%22all%22%7D`,
+      title: 'The Washington Post'
+    },
+    {
+      domain: 'bbc.com',
+      searchUrl: (q: string) => `https://www.bbc.com/search?q=${encodeURIComponent(q)}&d=news`,
+      title: 'BBC News'
+    },
+    {
+      domain: 'npr.org',
+      searchUrl: (q: string) => `https://www.npr.org/search?query=${encodeURIComponent(q)}&page=1`,
+      title: 'NPR'
+    },
+    {
+      domain: 'wsj.com',
+      searchUrl: (q: string) => `https://www.wsj.com/search?query=${encodeURIComponent(q)}&isToggleOn=true&operator=AND`,
+      title: 'Wall Street Journal'
+    },
+    // International Fact-Checkers
+    {
+      domain: 'fullfact.org',
+      searchUrl: (q: string) => `https://fullfact.org/search/?q=${encodeURIComponent(q)}`,
+      title: 'Full Fact UK'
+    },
+    {
+      domain: 'aap.com.au',
+      searchUrl: (q: string) => `https://www.aap.com.au/search/${encodeURIComponent(q)}/`,
+      title: 'AAP FactCheck'
+    },
+    {
+      domain: 'afp.com',
+      searchUrl: (q: string) => `https://factcheck.afp.com/search?keyword=${encodeURIComponent(q)}`,
+      title: 'AFP Fact Check'
+    },
+    // Science and Health Sources
+    {
+      domain: 'sciencedirect.com',
+      searchUrl: (q: string) => `https://www.sciencedirect.com/search?qs=${encodeURIComponent(q)}`,
+      title: 'ScienceDirect'
+    },
+    {
+      domain: 'who.int',
+      searchUrl: (q: string) => `https://www.who.int/home/search?indexCatalogue=genericsearchindex1&searchQuery=${encodeURIComponent(q)}`,
+      title: 'World Health Organization'
+    },
+    {
+      domain: 'cdc.gov',
+      searchUrl: (q: string) => `https://search.cdc.gov/search?query=${encodeURIComponent(q)}`,
+      title: 'CDC'
+    },
+    // Academic and Research Institutions
+    {
+      domain: 'scholar.google.com',
+      searchUrl: (q: string) => `https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`,
+      title: 'Google Scholar'
+    },
+    {
+      domain: 'jstor.org',
+      searchUrl: (q: string) => `https://www.jstor.org/action/doBasicSearch?Query=${encodeURIComponent(q)}`,
+      title: 'JSTOR'
+    },
+    // Government Sources
+    {
+      domain: 'congress.gov',
+      searchUrl: (q: string) => `https://www.congress.gov/search?q=${encodeURIComponent(q)}`,
+      title: 'Congress.gov'
+    },
+    {
+      domain: 'usa.gov',
+      searchUrl: (q: string) => `https://search.usa.gov/search?query=${encodeURIComponent(q)}`,
+      title: 'USA.gov'
+    },
+    // Additional News Sources
+    {
+      domain: 'economist.com',
+      searchUrl: (q: string) => `https://www.economist.com/search?q=${encodeURIComponent(q)}`,
+      title: 'The Economist'
+    },
+    {
+      domain: 'theguardian.com',
+      searchUrl: (q: string) => `https://www.theguardian.com/search?q=${encodeURIComponent(q)}`,
+      title: 'The Guardian'
+    },
+    {
+      domain: 'bloomberg.com',
+      searchUrl: (q: string) => `https://www.bloomberg.com/search?query=${encodeURIComponent(q)}`,
+      title: 'Bloomberg'
+    },
+    {
+      domain: 'nature.com',
+      searchUrl: (q: string) => `https://www.nature.com/search?q=${encodeURIComponent(q)}`,
+      title: 'Nature'
+    },
+    {
+      domain: 'science.org',
+      searchUrl: (q: string) => `https://www.science.org/action/doSearch?q=${encodeURIComponent(q)}`,
+      title: 'Science'
+    }
+  ];
+
+  try {
+    // Generate sources with proper search URLs
+    const sources = reliableSources.map(source => ({
+      title: `${source.title} fact-check results`,
+      url: source.searchUrl(query),
+      relevance: `Fact-check results from ${source.title}`
+    }));
+
+    // Validate each URL and only keep the first 3 valid ones with highest reliability
+    const validatedSources = [];
+    for (const source of sources) {
+      const isValid = await validateUrl(source.url);
+      if (isValid) {
+        validatedSources.push(source);
+        if (validatedSources.length === 3) break;
+      }
+    }
+
+    return validatedSources;
+  } catch (error) {
+    console.error('Error searching sources:', error);
+    return [];
+  }
+}
+
+// Helper function to extract and clean JSON from Claude's response
+function extractAndCleanJson(text: string): any {
+  try {
+    // Find the JSON object in the response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response');
+    }
+
+    let jsonStr = jsonMatch[0];
+    
+    // Basic cleaning that we know works
+    jsonStr = jsonStr
+      // Remove control characters
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+      // Replace line breaks and tabs with spaces
+      .replace(/[\n\r\t]/g, ' ')
+      // Remove multiple spaces
+      .replace(/ +/g, ' ')
+      .trim();
+
+    // Try to parse the JSON
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error('Failed to parse JSON:', error);
+    console.error('JSON string:', text);
+    throw new Error(`Failed to parse JSON: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -108,7 +351,7 @@ export async function POST(req: Request) {
     if (!body.type || !body.content) {
       return NextResponse.json(
         { error: 'Missing required fields: type and content' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -128,42 +371,28 @@ export async function POST(req: Request) {
       max_tokens: 4096,
       messages: [{
         role: "user",
-        content: type === 'image' 
-          ? `Analyze this image for authenticity and factual accuracy. Focus on:
-1. Signs of manipulation (lighting, perspective, artifacts)
-2. Comparison with known facts
-3. Technical analysis of authenticity
+        content: `Analyze this content for factual accuracy. Extract key claims and search for verification.
 
 Content to analyze: ${textToAnalyze}
 
-Respond in this JSON format:
-{
-  "transcription": "<detailed description>",
-  "reliability_score": <1-3 for manipulated, 4-7 for suspicious, 8-10 for authentic>,
-  "reliability_explanation": "<evidence-based explanation>",
-  "is_factual": <false if manipulated>,
-  "analysis": "<technical analysis and fact comparison>",
-  "false_claims": [{"claim": "<what image shows>", "correction": "<reality>"}],
-  "sources": [{"title": "<source>", "url": "<url>", "relevance": "<proof>"}]
-}`
-          : `Analyze this content for factual accuracy.
+First, identify up to 3 main claims or statements that need verification. Then, for each claim:
+1. Search reliable sources for verification
+2. Compare the claim against verified facts
+3. Provide direct links to fact-checking articles or primary sources (max 3 sources)
 
-Content to analyze: ${textToAnalyze}
-
-Respond in this JSON format:
+Return ONLY a JSON object in this exact format, with no additional text or explanation:
 {
   "transcription": "content summary",
   "reliability_score": 1-10,
   "reliability_explanation": "score justification",
   "is_factual": true/false,
   "analysis": "detailed analysis",
+  "key_claims": ["list of up to 3 main claims to verify"],
   "false_claims": [{"claim": "false claim", "correction": "truth"}],
-  "sources": [{"title": "source", "url": "url", "relevance": "relevance"}]
+  "sources": [{"title": "source", "url": "url", "relevance": "specific claim this source verifies"}]
 }`
       }],
-      system: type === 'image'
-        ? "You are a forensic image analyst. Be extremely skeptical and thorough."
-        : "You are a fact-checking assistant. Verify claims against reliable sources."
+      system: "You are a professional fact-checker. Focus on finding and verifying the most significant claims against reliable sources. Return ONLY valid JSON with no additional text."
     };
 
     const headers = {
@@ -172,14 +401,6 @@ Respond in this JSON format:
       'Content-Type': 'application/json'
     };
 
-    console.log('Making request with body:', {
-      ...requestBody,
-      messages: [{
-        role: "user",
-        content: "[content hidden for logs]"
-      }]
-    });
-
     const response = await axios.post(
       ANTHROPIC_API_URL,
       requestBody,
@@ -187,7 +408,6 @@ Respond in this JSON format:
     );
 
     if (!response.data || !response.data.content || !response.data.content[0]) {
-      console.error('Invalid response structure:', response.data);
       throw new Error('Invalid response from Claude');
     }
 
@@ -195,44 +415,46 @@ Respond in this JSON format:
     console.log('Raw response from Claude:', result);
     
     try {
-      // Try to clean the response if it contains any leading/trailing characters
-      const cleanedResult = result.trim();
-      let jsonStart = cleanedResult.indexOf('{');
-      let jsonEnd = cleanedResult.lastIndexOf('}');
+      const parsedResult = extractAndCleanJson(result);
       
-      if (jsonStart === -1 || jsonEnd === -1) {
-        console.error('Invalid response format:', cleanedResult);
-        throw new Error('Could not find valid JSON in response');
+      // Add reliability color
+      parsedResult.reliability_indicator = {
+        score: parsedResult.reliability_score,
+        color: getReliabilityColor(parsedResult.reliability_score)
+      };
+
+      // Extract key claims and search for additional sources
+      if (parsedResult.key_claims && Array.isArray(parsedResult.key_claims)) {
+        const additionalSources = await Promise.all(
+          parsedResult.key_claims.map((claim: string) => searchReliableSources(claim))
+        );
+
+        // Combine all sources
+        const allSources = [
+          ...(parsedResult.sources || []),
+          ...additionalSources.flat()
+        ];
+
+        // Remove duplicates and keep only the top 3 most relevant sources
+        const uniqueSources = Array.from(new Set(
+          allSources.map(source => JSON.stringify(source))
+        )).map(str => JSON.parse(str));
+
+        parsedResult.sources = uniqueSources.slice(0, 3);
       }
-      
-      const jsonStr = cleanedResult.substring(jsonStart, jsonEnd + 1);
-      console.log('Attempting to parse JSON:', jsonStr);
-      
-      const parsedResult = JSON.parse(jsonStr);
-      
-      // Validate the required fields
-      if (!parsedResult.transcription || 
-          !parsedResult.reliability_score || 
-          typeof parsedResult.is_factual !== 'boolean' || 
-          !parsedResult.analysis) {
-        console.error('Missing required fields in response:', parsedResult);
-        throw new Error('Response is missing required fields');
-      }
-      
-      return NextResponse.json(parsedResult);
+
+      return NextResponse.json(parsedResult, { headers: corsHeaders });
     } catch (error) {
       console.error('Error processing response:', {
         error: error instanceof Error ? error.message : 'Unknown error',
         rawResponse: result
       });
-      
       throw new Error(
         error instanceof Error 
           ? `Failed to process response: ${error.message}`
           : 'Failed to process response'
       );
     }
-
   } catch (error: any) {
     console.error('Error details:', {
       message: error.message,
@@ -242,7 +464,7 @@ Respond in this JSON format:
     
     return NextResponse.json(
       { error: error.response?.data?.error?.message || error.message },
-      { status: error.response?.status || 500 }
+      { status: error.response?.status || 500, headers: corsHeaders }
     );
   }
 }

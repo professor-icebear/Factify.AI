@@ -1,0 +1,348 @@
+:root {
+  --color-cream: #FAF7F5;
+  --color-cream-muted: #F5F0ED;
+  --color-wine: #722F37;
+  --color-wine-dark: #441B20;
+  --color-red-50: #FEF2F2;
+  --color-red-200: #FECACA;
+  --color-red-700: #B91C1C;
+  --color-green-50: #F0FDF4;
+  --color-green-200: #BBF7D0;
+  --color-green-700: #15803D;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 350px;
+  height: auto;
+  min-height: fit-content;
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #FAF7F5;
+  color: #441B20;
+  transition: height 0.3s ease;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+body.expanded {
+  height: 500px;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Initial View Styles */
+.initial-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.analysis-view {
+  height: 450px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Header Styles */
+header {
+  text-align: center;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: bold;
+  color: #722F37;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: rgba(68, 27, 32, 0.6);
+  margin: 4px 0 0 0;
+}
+
+/* Section Styles */
+.section {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  padding: 16px 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 4px solid #722F37;
+  border-top: 4px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error Styles */
+.error-box {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 12px;
+  padding: 16px;
+  color: #B91C1C;
+}
+
+/* Results Styles */
+.results-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+  width: calc(100% - 16px);
+}
+
+/* Score Section */
+.score-section {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.score-section h2 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #722F37;
+}
+
+.score-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.score-circle {
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--score-color, #722F37);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--score-color, #722F37);
+  background-color: white;
+  transition: all 0.3s ease;
+  margin-right: 8px;
+}
+
+/* Score color classes */
+.score-low {
+  --score-color: #DC2626;
+}
+
+.score-medium {
+  --score-color: #CA8A04;
+}
+
+.score-high {
+  --score-color: #15803D;
+}
+
+.score-max {
+  color: rgba(68, 27, 32, 0.6);
+  font-size: 18px;
+}
+
+.explanation {
+  font-style: italic;
+  color: rgba(68, 27, 32, 0.8);
+  line-height: 1.5;
+  background-color: rgba(114, 47, 55, 0.05);
+  padding: 10px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.status-box {
+  padding: 10px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.status-box.factual {
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+}
+
+.status-box.non-factual {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+}
+
+/* Analysis Section */
+.analysis-section {
+  margin: 12px 0;
+}
+
+.analysis-section h2,
+.claims-section h2,
+.sources-section h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #722F37;
+}
+
+/* Claims Section */
+.claims-section {
+  margin: 12px 0;
+}
+
+.false-claims {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--color-red-50);
+  border: 1px solid var(--color-red-200);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+/* Individual false claim styling */
+.false-claim-item {
+  padding: 10px;
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.false-claim-item .claim {
+  font-weight: 600;
+  color: var(--color-red-700);
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.false-claim-item .correction {
+  color: var(--color-green-700);
+  font-size: 13px;
+  line-height: 1.4;
+  padding-left: 8px;
+  border-left: 2px solid var(--color-green-700);
+  margin-top: 6px;
+}
+
+/* Sources Section */
+.sources-section {
+  background-color: rgba(114, 47, 55, 0.05);
+  padding: 10px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.source-item {
+  background-color: white;
+  border: 1px solid rgba(114, 47, 55, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  transition: all 0.2s ease;
+}
+
+.source-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.source-title {
+  color: #722F37;
+  font-weight: 600;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.source-title:hover {
+  text-decoration: underline;
+}
+
+.source-relevance {
+  color: rgba(68, 27, 32, 0.8);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Button Styles */
+.analyze-button {
+  width: 100%;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(to right, #722F37, #441B20);
+  color: #FAF7F5;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.analyze-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px; /* Make scrollbar thinner */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px; /* Add some margin around the scrollbar */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(114, 47, 55, 0.2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(114, 47, 55, 0.4);
+} 
